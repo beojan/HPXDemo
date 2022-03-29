@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 project(HPXDemo CXX)
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 find_package(HPX REQUIRED)
 find_package(Boost REQUIRED)
 find_package(fmt)
