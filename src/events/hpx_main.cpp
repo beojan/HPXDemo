@@ -5,11 +5,18 @@
 #include <thread>
 
 #include "HPXSched.h"
-#include <fmt/format.h>
 #include <fmt/chrono.h>
+#include <fmt/format.h>
 #include <hpx/wrap_main.hpp>
 
 using namespace std::chrono_literals;
+
+template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
+    // Busy waits for a given length of time.
+    auto start = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - start < time) {
+    }
+}
 
 long long plus(long long x, long long y) {
     // fmt::print("Running plus({}, {})\n", x, y);
@@ -25,7 +32,7 @@ long long times(long long x, long long y) {
 
 long long square(long long x) {
     // fmt::print("Running square({})\n", x);
-    // std::this_thread::sleep_for(1s);
+    busy_wait(100us);
     return x * x;
 }
 
@@ -64,24 +71,30 @@ int main(int argc, char* argv[]) {
             break;
         }
         auto start_tm = std::chrono::steady_clock::now();
-        for (int i = 0; i < 100000; ++i) {
+        for (int i = 0; i < 300000; ++i) {
             EvtCtx& ec = evts.emplace_back();
             ec = ec_template;
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
             bool success = scheduler.schedule(ec);
             outputs.push_back(*final_ans);
         }
-        fmt::print("Took {} ms to schedule 100,000 events\n", (std::chrono::steady_clock::now() - start_tm) / 1ms);
+        fmt::print("Took {} to schedule 300,000 events\n",
+                   std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                         std::chrono::steady_clock::now() - start_tm));
     }
     fmt::print("Waiting for all events\n");
     auto start_tm = std::chrono::steady_clock::now();
     hpx::wait_all(outputs.begin(), outputs.end());
-    fmt::print("Took {} ms extra waiting for all events\n", (std::chrono::steady_clock::now() - start_tm) / 1ms);
+    fmt::print("Took {} extra waiting for all events\n",
+               std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1, 1>>>(
+                     std::chrono::steady_clock::now() - start_tm));
     start_tm = std::chrono::steady_clock::now();
     volatile long long o = 0;
     for (auto&& out : outputs) {
-      o = out.get();
+        o = out.get();
     }
-    fmt::print("Took {} ms reading out futures\n", (std::chrono::steady_clock::now() - start_tm) / 1ms);
+    fmt::print("Took {} reading out futures\n",
+               std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                     std::chrono::steady_clock::now() - start_tm));
     return 0;
 }
