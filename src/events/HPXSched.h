@@ -83,13 +83,13 @@ template <class... Defs> class Sched {
                 // Schedule this function
                 auto func = hana::at_c<2>(item);
                 if constexpr (hana::is_empty(inputs)) {
-                    fmt::print("Scheduling {} with no inputs\n", key.c_str());
+                    // fmt::print("Scheduling {} with no inputs\n", key.c_str());
                     res = new hpx::shared_future{hpx::async(func)};
                 }
                 else {
                     // Schedule every input
                     auto input_res = hana::transform(inputs, self);
-                    fmt::print("Scheduling calculation of {} with inputs\n", key.c_str());
+                    // fmt::print("Scheduling calculation of {} with inputs\n", key.c_str());
                     res = new hpx::shared_future{hana::unpack(
                           input_res, hana::partial(dataflow, hpx::unwrapping(func)))};
                 }
@@ -102,7 +102,7 @@ template <class... Defs> class Sched {
             if (!is_required(item)) {
                 return;
             }
-            fmt::print("\n{} is required -- scheduling\n", key.c_str());
+            // fmt::print("\n{} is required -- scheduling\n", key.c_str());
             run(key);
         };
         hana::for_each(hana::keys(definitions), run_if_required);
