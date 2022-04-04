@@ -64,6 +64,8 @@ int main(int argc, char* argv[]) {
     std::deque<EvtCtx> evts{};
     std::deque<hpx::shared_future<long long>> outputs{};
 
+    long long n_evts = 0;
+    std::chrono::duration<double, std::milli> total_time = 0ms;
     while (in.good()) {
         EvtCtx ec_template{};
         in >> ec_template.Five >> ec_template.Ten;
@@ -77,10 +79,12 @@ int main(int argc, char* argv[]) {
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
             bool success = scheduler.schedule(ec);
             outputs.push_back(*final_ans);
+            n_evts++;
         }
-        fmt::print("Took {} to schedule 300,000 events\n",
-                   std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
-                         std::chrono::steady_clock::now() - start_tm));
+        auto this_time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
+              std::chrono::steady_clock::now() - start_tm);
+        total_time += this_time;
+        fmt::print("Took {} to schedule 300,000 events\n", this_time);
     }
     fmt::print("Waiting for all events\n");
     auto start_tm = std::chrono::steady_clock::now();
@@ -88,6 +92,7 @@ int main(int argc, char* argv[]) {
     fmt::print("Took {} extra waiting for all events\n",
                std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1, 1>>>(
                      std::chrono::steady_clock::now() - start_tm));
+    fmt::print("Took {} total ({} average) scheduling events\n", total_time, total_time / n_evts);
     start_tm = std::chrono::steady_clock::now();
     volatile long long o = 0;
     for (auto&& out : outputs) {
