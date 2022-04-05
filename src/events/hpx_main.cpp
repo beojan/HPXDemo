@@ -32,7 +32,7 @@ long long times(long long x, long long y) {
 
 long long square(long long x) {
     // fmt::print("Running square({})\n", x);
-    busy_wait(100us);
+    busy_wait(1s);
     return x * x;
 }
 
@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
             break;
         }
         auto start_tm = std::chrono::steady_clock::now();
-        for (int i = 0; i < 300000; ++i) {
+        for (int i = 0; i < 50; ++i) {
             EvtCtx& ec = evts.emplace_back();
             ec = ec_template;
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
         auto this_time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
               std::chrono::steady_clock::now() - start_tm);
         total_time += this_time;
-        fmt::print("Took {} to schedule 300,000 events\n", this_time);
+        fmt::print("Took {} to schedule 50 events\n", this_time);
     }
     fmt::print("Waiting for all events\n");
     auto start_tm = std::chrono::steady_clock::now();
