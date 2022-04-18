@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.17)
 project(HPXDemo CXX)
 find_package(HPX REQUIRED)
 find_package(Boost REQUIRED)
