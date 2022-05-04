@@ -4,20 +4,20 @@
 #include <hpx/iostream.hpp>
 #include <hpx/local/future.hpp>
 
-#include <vector>
 #include "dataclass.h"
+#include <vector>
 
-Event hello_world(Event evt, Simple s)
-{
+Event hello_world(Event evt, Simple s) {
     std::size_t const os_threads = hpx::get_os_thread_count();
-    hpx::cout << "Action executed on locality " << hpx::get_locality_name() << "(" << hpx::get_locality_id() << ") with " << os_threads << " threads. Event state: " << evt.print_state() << ", Elem: " << s.getElem() << hpx::endl;
+    hpx::cout << "Action executed on locality " << hpx::get_locality_name() << "("
+              << hpx::get_locality_id() << ") with " << os_threads
+              << " threads. Event state: " << evt << ", Elem: " << s.getElem() << hpx::endl;
     return evt;
 }
 
 HPX_PLAIN_ACTION(hello_world, hello_world_action);
 
-int main()
-{
+int main() {
     std::vector<hpx::naming::id_type> localities = hpx::find_all_localities();
 
     std::vector<hpx::lcos::future<Event>> futures;
@@ -25,15 +25,14 @@ int main()
     std::string name("evtid");
     Event evt(name, 15);
     Simple s(23.4);
-    for (hpx::naming::id_type const &node : localities)
-    {
+    for (hpx::naming::id_type const& node : localities) {
         futures.push_back(hpx::async<hello_world_action>(node, evt, s));
     }
     hpx::wait_all(futures);
-    
-    for (auto &&f: futures){
+
+    for (auto&& f : futures) {
         auto result = f.get();
-        hpx::cout << "Got result from future: " << result.print_state() << hpx::endl;
+        hpx::cout << "Got result from future: " << result << hpx::endl;
     }
     return 0;
 }
