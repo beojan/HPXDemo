@@ -1,22 +1,33 @@
 #pragma once
 
-#include <hpx/modules/serialization.hpp>
+#include <hpx/iostream.hpp>
+#include <hpx/serialization.hpp>
+#include <hpx/serialization/string.hpp>
+#include <hpx/serialization/vector.hpp>
 #include <string>
 #include <vector>
 
 /**
- * Can't serialize either of these two classes to another node if we have no default constructor.
+ * Segfault when serializing Event to remote nodes:
+ * src/tcmalloc.cc:333] Attempt to free invalid pointer
  **/
 
-// set with cmake -DUSE_DEFAULT_CONSTRUCTOR
-//#define USE_DEFAULT_CONSTRUCTOR 1
+#ifndef USE_DEFAULT_CONSTRUCTOR
 
-using namespace std;
+class Event;
+class Simple;
+
+namespace hpx::serialization {
+
+template <class Archive> inline void save_construct_data(Archive&, Event const*, unsigned);
+
+template <class Archive> inline void save_construct_data(Archive&, Simple const*, unsigned);
+} // namespace hpx::serialization
+#endif
 
 class Event {
-    friend class hpx::serialization::access;
-    vector<int> data;
-    string name;
+    std::vector<int> data;
+    std::string name;
     template <class Archive> void serialize(Archive& ar, unsigned int version);
 
   public:
@@ -25,16 +36,18 @@ class Event {
 #else
     Event() = delete;
 #endif
-    Event(const string& name, size_t n_elem);
-    Event(const string& name, const vector<int>& data);
+    Event(const std::string& name, size_t n_elem);
+    Event(const std::string& name, const std::vector<int>& data);
 
-    friend ostream& operator<<(ostream& os, const Event& e);
+    friend std::ostream& operator<<(std::ostream& os, const Event& e);
+    template <class Archive>
+    friend void hpx::serialization::save_construct_data(Archive&, Event const*, unsigned);
+    friend class hpx::serialization::access;
 };
 
 // Simple class with just a double and no extra memory allocated
 class Simple {
     double elem;
-    friend class hpx::serialization::access;
     template <class Archive> void serialize(Archive& ar, unsigned int version);
 
   public:
@@ -45,31 +58,37 @@ class Simple {
 #endif
     Simple(double);
 
-    double getElem() { return elem; }
+    decltype(elem) getElem() const { return elem; }
+    friend class hpx::serialization::access;
+    template <class Archive>
+    friend void hpx::serialization::save_construct_data(Archive&, Simple const*, unsigned);
 };
 
-template <class Archive> void Simple::serialize(Archive& ar, unsigned int version) { ar& elem; }
-
-template <class Archive> void Event::serialize(Archive& ar, unsigned int version) {
-    ar& name& data;
+template <class Archive> void Simple::serialize(Archive& ar, unsigned int version) {
+    // ar& elem;
 }
 
-namespace hpx {
-namespace serialization {
-// We can use serialize member function instead of overriding save_construct_data
-
-// template <class Archive>
-// inline void save_construct_data(Archive &ar, Event const *t, unsigned file_version)
-// {
-// hpx::cout << "in save_construct_data" << hpx::endl;
-// ar << t->name << t->data;
-// }
+template <class Archive> void Event::serialize(Archive& ar, unsigned int version) {
+    // ar& name& data;
+}
 
 #ifndef USE_DEFAULT_CONSTRUCTOR
+namespace hpx::serialization {
+
+template <class Archive>
+inline void save_construct_data(Archive& ar, Event const* t, unsigned file_version) {
+    ar & t->name & t->data;
+}
+
+template <class Archive>
+inline void save_construct_data(Archive& ar, Simple const* t, unsigned file_version) {
+    ar & t->elem;
+}
+
 template <class Archive>
 inline void load_construct_data(Archive& ar, Event* t, unsigned file_version) {
-    string name;
-    vector<int> v;
+    std::string name;
+    std::vector<int> v;
     ar& name& v;
     ::new (t) Event(name, v);
 }
@@ -79,6 +98,6 @@ inline void load_construct_data(Archive& ar, Simple* t, unsigned file_version) {
     ar& d;
     ::new (t) Simple(d);
 }
+
+} // namespace hpx::serialization
 #endif
-} // namespace serialization
-} // namespace hpx

@@ -1,6 +1,5 @@
 #include "dataclass.h"
 #include <random>
-#include <sstream>
 
 Event::Event(const std::string& name, size_t n_elem) : data(n_elem), name(name) {
     std::mt19937 gen(std::random_device{}());
@@ -12,7 +11,7 @@ Event::Event(const std::string& name, size_t n_elem) : data(n_elem), name(name) 
 
 Event::Event(const std::string& name, const std::vector<int>& data) : data(data), name(name) {}
 
-ostream& operator<<(ostream& os, const Event& e) {
+std::ostream& operator<<(std::ostream& os, const Event& e) {
     os << e.name << "(";
     for (auto it = e.data.cbegin(); it != e.data.cend(); ++it) {
         os << *it;
