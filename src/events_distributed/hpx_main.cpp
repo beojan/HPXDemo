@@ -71,9 +71,12 @@ int main(int argc, char* argv[]) {
     std::ifstream in{argv[1]};
     std::deque<EvtCtx> evts{};
     std::deque<hpx::shared_future<long long>> outputs{};
+    std::vector localities = hpx::find_all_localities();
+    fmt::print("We have {} localities\n", localities.size());
 
     long long n_evts = 0;
     std::chrono::duration<double, std::milli> total_time = 0ms;
+    int counter = 0;
     while (in.good()) {
         EvtCtx ec_template{};
         in >> ec_template.Five >> ec_template.Ten;
@@ -81,11 +84,13 @@ int main(int argc, char* argv[]) {
             break;
         }
         auto start_tm = std::chrono::steady_clock::now();
+        auto loc = localities[counter++ % localities.size()];
+        fmt::print("Scheduling on {}\n", loc);
         for (int i = 0; i < n_evts_per_block; ++i) {
             EvtCtx& ec = evts.emplace_back();
             ec = ec_template;
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
-            bool success = scheduler.schedule(ec);
+            bool success = scheduler.schedule(ec, loc);
             outputs.push_back(*final_ans);
             n_evts++;
         }
