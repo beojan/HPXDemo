@@ -15,6 +15,7 @@ using namespace hana::literals;
 
 #include <hpx/async_distributed/async.hpp>
 #include <hpx/async_distributed/dataflow.hpp>
+#include <hpx/runtime.hpp>
 #include <hpx/local/future.hpp>
 #include <hpx/pack_traversal/unwrap.hpp>
 
