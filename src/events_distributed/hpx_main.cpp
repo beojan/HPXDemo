@@ -7,6 +7,7 @@
 #include "HPXSched.h"
 #include <fmt/chrono.h>
 #include <fmt/ostream.h>
+#include <fmt/ranges.h>
 #include <fmt/format.h>
 #include <hpx/hpx.hpp>
 #include <hpx/wrap_main.hpp>
@@ -38,7 +39,7 @@ HPX_PLAIN_ACTION(times_fn, times);
 long long square_fn(long long x) {
     // fmt::print("Running square({})\n", x);
     busy_wait(100us);
-    fmt::print("Running on locality {}\n", hpx::find_here().get_gid());
+    // fmt::print("Running on locality {}\n", hpx::find_here().get_gid());
     return x * x;
 }
 HPX_PLAIN_ACTION(square_fn, square);
@@ -72,8 +73,7 @@ int main(int argc, char* argv[]) {
     std::deque<EvtCtx> evts{};
     std::deque<hpx::shared_future<long long>> outputs{};
     std::vector localities = hpx::find_all_localities();
-    fmt::print("We have {} localities\n", localities.size());
-
+    fmt::print("We have {} localities\n{}\n\n", localities.size(), localities);
     long long n_evts = 0;
     std::chrono::duration<double, std::milli> total_time = 0ms;
     int counter = 0;
