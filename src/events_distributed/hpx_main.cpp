@@ -3,61 +3,29 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <utility>
 
+#include "AlgComp.h"
 #include "HPXSched.h"
 #include <fmt/chrono.h>
-#include <fmt/ostream.h>
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <hpx/hpx.hpp>
+#include <hpx/modules/distribution_policies.hpp>
 #include <hpx/wrap_main.hpp>
 
 constexpr int n_evts_per_block = 3000;
 using namespace std::chrono_literals;
 
-template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
-    // Busy waits for a given length of time.
-    auto start = std::chrono::steady_clock::now();
-    while (std::chrono::steady_clock::now() - start < time) {
-    }
-}
-
-long long plus_fn(long long x, long long y) {
-    // fmt::print("Running plus({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
-    return x + y;
-}
-HPX_PLAIN_ACTION(plus_fn, plus);
-
-long long times_fn(long long x, long long y) {
-    // fmt::print("Running times({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
-    return x * y;
-}
-HPX_PLAIN_ACTION(times_fn, times);
-
-long long square_fn(long long x) {
-    // fmt::print("Running square({})\n", x);
-    busy_wait(100us);
-    fmt::print("Running on locality {}\n", hpx::find_here().get_gid());
-    return x * x;
-}
-HPX_PLAIN_ACTION(square_fn, square);
-
-long long cube_fn(long long x) {
-    // fmt::print("Running cube({})\n", x);
-    // std::this_thread::sleep_for(100s);
-    return x * x * x;
-}
-HPX_PLAIN_ACTION(cube_fn, cube);
-
 sch::Sched scheduler{
-      sch::Define("Cube Plus"_s, hana::make_tuple("Ten plus Five"_s), cube{}),
-      sch::Define("Cube Times"_s, hana::make_tuple("Ten times Five"_s), cube{}),
-      sch::Define("Ten plus Five"_s, hana::make_tuple("Five"_in, "Ten"_in), plus{}),
-      sch::Define("Ten times Five"_s, hana::make_tuple("Five"_in, "Ten"_in), times{}),
-      sch::Define("Square Plus"_s, hana::make_tuple("Ten plus Five"_s), square{}),
-      sch::Define("Square Times"_s, hana::make_tuple("Ten times Five"_s), square{}),
-      sch::Define("Add Squares"_s, hana::make_tuple("Square Plus"_s, "Square Times"_s), plus{})};
+      sch::Define("Cube Plus"_s, hana::make_tuple("Ten plus Five"_s), AlgComp::cube{}),
+      sch::Define("Cube Times"_s, hana::make_tuple("Ten times Five"_s), AlgComp::cube{}),
+      sch::Define("Ten plus Five"_s, hana::make_tuple("Five"_in, "Ten"_in), AlgComp::plus{}),
+      sch::Define("Ten times Five"_s, hana::make_tuple("Five"_in, "Ten"_in), AlgComp::times{}),
+      sch::Define("Square Plus"_s, hana::make_tuple("Ten plus Five"_s), AlgComp::square{}),
+      sch::Define("Square Times"_s, hana::make_tuple("Ten times Five"_s), AlgComp::square{}),
+      sch::Define("Add Squares"_s, hana::make_tuple("Square Plus"_s, "Square Times"_s),
+                  AlgComp::plus{})};
 struct EvtCtx : public decltype(scheduler)::ECBase {
     long long Five = 5;
     long long Ten = 10;
@@ -71,8 +39,9 @@ int main(int argc, char* argv[]) {
     std::ifstream in{argv[1]};
     std::deque<EvtCtx> evts{};
     std::deque<hpx::shared_future<long long>> outputs{};
-    std::vector localities = hpx::find_all_localities();
-    fmt::print("We have {} localities\n", localities.size());
+    auto n_localities = hpx::get_num_localities();
+    std::vector<hpx::id_type> components = hpx::new_<AlgComp[]>(hpx::binpacked(hpx::find_all_localities()), n_localities.get()).get();
+    fmt::print("We have {} components\n", components.size());
 
     long long n_evts = 0;
     std::chrono::duration<double, std::milli> total_time = 0ms;
@@ -84,7 +53,7 @@ int main(int argc, char* argv[]) {
             break;
         }
         auto start_tm = std::chrono::steady_clock::now();
-        auto loc = localities[counter++ % localities.size()];
+        auto loc = components[counter++ % components.size()];
         fmt::print("Scheduling on {}\n", loc);
         for (int i = 0; i < n_evts_per_block; ++i) {
             EvtCtx& ec = evts.emplace_back();

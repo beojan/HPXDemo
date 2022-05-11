@@ -16,8 +16,9 @@ target_link_libraries(HPXDemo_scalar HPX::hpx HPX::wrap_main Boost::boost fmt::f
 add_executable(HPXDemo src/events/hpx_main.cpp)
 target_link_libraries(HPXDemo HPX::hpx HPX::wrap_main Boost::boost fmt::fmt compile_features)
 
+add_subdirectory(src/events_distributed/algs)
 add_executable(HPXDemoDist src/events_distributed/hpx_main.cpp)
-target_link_libraries(HPXDemoDist HPX::hpx HPX::wrap_main Boost::boost fmt::fmt compile_features)
+target_link_libraries(HPXDemoDist AlgComp HPX::hpx HPX::wrap_main Boost::boost fmt::fmt compile_features)
 
 add_executable(HPXSerializationDistributed src/hpx_serialization/dataclass.cpp src/hpx_serialization/main.cpp)
 
