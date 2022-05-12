@@ -20,5 +20,3 @@ std::ostream& operator<<(std::ostream& os, const Event& e) {
     os << ")";
     return os;
 }
-
-Simple::Simple(double elem) : elem(elem) {}

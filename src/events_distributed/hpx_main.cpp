@@ -8,6 +8,7 @@
 #include "AlgComp.h"
 #include "HPXSched.h"
 #include <fmt/chrono.h>
+#include <fmt/ranges.h>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <hpx/hpx.hpp>
@@ -41,7 +42,7 @@ int main(int argc, char* argv[]) {
     std::deque<hpx::shared_future<long long>> outputs{};
     auto n_localities = hpx::get_num_localities();
     std::vector<hpx::id_type> components = hpx::new_<AlgComp[]>(hpx::binpacked(hpx::find_all_localities()), n_localities.get()).get();
-    fmt::print("We have {} components\n", components.size());
+    fmt::print("We have {} components\n{}\n\n", components.size(), components);
 
     long long n_evts = 0;
     std::chrono::duration<double, std::milli> total_time = 0ms;
