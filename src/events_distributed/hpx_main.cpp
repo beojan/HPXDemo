@@ -12,7 +12,7 @@
 #include <hpx/hpx.hpp>
 #include <hpx/wrap_main.hpp>
 
-constexpr int n_evts_per_block = 3000;
+constexpr int n_evts_per_block = 30000;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {

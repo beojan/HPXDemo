@@ -9,6 +9,8 @@
 #include <fmt/format.h>
 #include <hpx/wrap_main.hpp>
 
+#include <Eigen/Dense>
+using Mtrx = Eigen::Matrix<double, 10, 10>;
 constexpr int n_evts_per_block = 300000;
 using namespace std::chrono_literals;
 
@@ -19,21 +21,32 @@ template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
     }
 }
 
-long long plus(long long x, long long y) {
+Mtrx* make_mtrx(long long x) {
+    Mtrx* mtrx = new Mtrx();
+    (*mtrx) = Mtrx::Random() * x;
+    return mtrx;
+}
+
+long long plus(Mtrx* x, Mtrx* y) {
+    // fmt::print("Running plus({}, {})\n", x, y);
+    // std::this_thread::sleep_for(1s);
+    return static_cast<long long>((*x + *y).determinant());
+}
+
+long long scal_plus(long long x, long long y) {
     // fmt::print("Running plus({}, {})\n", x, y);
     // std::this_thread::sleep_for(1s);
     return x + y;
 }
 
-long long times(long long x, long long y) {
+long long times(Mtrx* x, Mtrx* y) {
     // fmt::print("Running times({}, {})\n", x, y);
     // std::this_thread::sleep_for(1s);
-    return x * y;
+    return static_cast<long long>((*x * *y).determinant());
 }
 
 long long square(long long x) {
     // fmt::print("Running square({})\n", x);
-    busy_wait(100us);
     return x * x;
 }
 
@@ -44,13 +57,15 @@ long long cube(long long x) {
 }
 
 sch::Sched scheduler{
+      sch::Define("Matrix Five"_s, hana::make_tuple("Five"_in), make_mtrx),
+      sch::Define("Matrix Ten"_s, hana::make_tuple("Ten"_in), make_mtrx),
       sch::Define("Cube Plus"_s, hana::make_tuple("Ten plus Five"_s), cube),
       sch::Define("Cube Times"_s, hana::make_tuple("Ten times Five"_s), cube),
-      sch::Define("Ten plus Five"_s, hana::make_tuple("Five"_in, "Ten"_in), plus),
-      sch::Define("Ten times Five"_s, hana::make_tuple("Five"_in, "Ten"_in), times),
+      sch::Define("Ten plus Five"_s, hana::make_tuple("Matrix Five"_s, "Matrix Ten"_s), plus),
+      sch::Define("Ten times Five"_s, hana::make_tuple("Matrix Five"_s, "Matrix Ten"_s), times),
       sch::Define("Square Plus"_s, hana::make_tuple("Ten plus Five"_s), square),
       sch::Define("Square Times"_s, hana::make_tuple("Ten times Five"_s), square),
-      sch::Define("Add Squares"_s, hana::make_tuple("Square Plus"_s, "Square Times"_s), plus)};
+      sch::Define("Add Squares"_s, hana::make_tuple("Square Plus"_s, "Square Times"_s), scal_plus)};
 struct EvtCtx : public decltype(scheduler)::ECBase {
     long long Five = 5;
     long long Ten = 10;
