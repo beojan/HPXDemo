@@ -35,7 +35,7 @@ long long plus(Mtrx* x, Mtrx* y) {
 }
 
 long long scal_plus(long long x, long long y) {
-    fmt::print("Running scal_plus({}, {})\n", x, y);
+    // fmt::print("Running scal_plus({}, {})\n", x, y);
     // std::this_thread::sleep_for(1s);
     return x + y;
 }
@@ -96,6 +96,7 @@ int main(int argc, char* argv[]) {
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
             bool success = scheduler.schedule(ec);
             outputs.push_back(*final_ans);
+            final_ans->then(scheduler.cleanup(ec));
             n_evts++;
         }
         auto this_time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(

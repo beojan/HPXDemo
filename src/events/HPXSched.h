@@ -2,6 +2,7 @@
 #ifndef HPXSCHED_H
 #define HPXSCHED_H
 #include <functional>
+#include <type_traits>
 
 #include <fmt/format.h>
 
@@ -34,9 +35,10 @@ template <class Key, class Inputs, class Func> auto Define(Key key, Inputs input
     static_assert(hana::Sequence<Inputs>::value, "Define's inputs must be a tuple");
     using func_ret_t = ct::return_type_t<Func>;
     using fut_p = hpx::shared_future<func_ret_t>*;
-    // Tuple items are: key, inputs tuple, function to calculate, required, func returning ref-to-ptr-to-future, prototype ptr-to-future
+    // Tuple items are: key, inputs tuple, function to calculate, required, func returning
+    // ref-to-ptr-to-future, prototype ptr-to-future
     return hana::make_pair(key, hana::make_tuple(
-                               key, inputs, std::function{func}, false,
+                                      key, inputs, std::function{func}, false,
                                       [](auto& ec) -> fut_p& { return ec.slot[Key{}]; }, fut_p{}));
 }
 
@@ -90,8 +92,8 @@ template <class... Defs> class Sched {
                     // Schedule every input
                     auto input_res = hana::transform(inputs, self);
                     // fmt::print("Scheduling calculation of {} with inputs\n", key.c_str());
-                    res = new hpx::shared_future{hana::unpack(
-                          input_res, hana::partial(dataflow, hpx::unwrapping(func)))};
+                    res = new hpx::shared_future{
+                          hana::unpack(input_res, hana::partial(dataflow, hpx::unwrapping(func)))};
                 }
                 // Return future to be used as input in downstream calculations
                 return *res;
@@ -107,6 +109,29 @@ template <class... Defs> class Sched {
         };
         hana::for_each(hana::keys(definitions), run_if_required);
         return true;
+    }
+
+    // Helper to schedule cleanup
+    template <typename EC> auto cleanup(EC& ec) {
+        return [this, &ec](auto&& /* future */) {
+            // Delete any intermediate values if they are pointers to free memory
+            auto delete_intermediates = [&ec](auto&& item) {
+                constexpr auto is_required = hana::reverse_partial(hana::at, hana::size_c<3>);
+                if (!is_required(item)) {
+                    auto& fut = hana::at_c<4>(item)(ec);
+                    if (!fut || !fut->valid()) {
+                        return;
+                    }
+                    auto& val = fut->get();
+                    if constexpr (std::is_pointer_v<std::remove_reference_t<decltype(val)>>) {
+                        if (val) {
+                            delete val;
+                        }
+                    }
+                }
+            };
+            hana::for_each(hana::values(definitions), delete_intermediates);
+        };
     }
 };
 
