@@ -118,7 +118,7 @@ template <class... Defs> class Sched {
             auto delete_intermediates = [&ec](auto&& item) {
                 constexpr auto is_required = hana::reverse_partial(hana::at, hana::size_c<3>);
                 if (!is_required(item)) {
-                    auto& fut = hana::at_c<4>(item)(ec);
+                    auto* fut = hana::at_c<4>(item)(ec);
                     if (!fut || !fut->valid()) {
                         return;
                     }

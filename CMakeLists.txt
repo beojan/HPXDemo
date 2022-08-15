@@ -5,23 +5,25 @@ find_package(Boost REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt)
 
-add_library(compile_features INTERFACE)
-target_compile_features(compile_features INTERFACE cxx_std_17)
+add_library(global_options INTERFACE)
+target_compile_features(global_options INTERFACE cxx_std_17 )
+target_compile_options(global_options INTERFACE -fsanitize=address -fsanitize=undefined)
+target_link_options(global_options INTERFACE -fsanitize=address -fsanitize=undefined)
 
 add_executable(NoHPXDemo src/no_hpx/main.cpp)
-target_link_libraries(NoHPXDemo Boost::boost fmt::fmt compile_features)
+target_link_libraries(NoHPXDemo Boost::boost fmt::fmt global_options)
 
 add_executable(HPXDemo_scalar src/scalar/hpx_main_scalar.cpp)
-target_link_libraries(HPXDemo_scalar HPX::hpx HPX::wrap_main Boost::boost fmt::fmt compile_features)
+target_link_libraries(HPXDemo_scalar HPX::hpx HPX::wrap_main Boost::boost fmt::fmt global_options)
 
 add_executable(HPXDemo src/events/hpx_main.cpp)
-target_link_libraries(HPXDemo HPX::hpx HPX::wrap_main Boost::boost Eigen3::Eigen fmt::fmt compile_features)
+target_link_libraries(HPXDemo HPX::hpx HPX::wrap_main Boost::boost Eigen3::Eigen fmt::fmt global_options)
 
 add_executable(HPXDemoCUDA src/events_cuda/hpx_main.cpp)
-target_link_libraries(HPXDemoCUDA HPX::hpx HPX::wrap_main Boost::boost Eigen3::Eigen fmt::fmt compile_features)
+target_link_libraries(HPXDemoCUDA HPX::hpx HPX::wrap_main Boost::boost Eigen3::Eigen fmt::fmt global_options)
 
 add_executable(HPXDemoDist src/events_distributed/hpx_main.cpp)
-target_link_libraries(HPXDemoDist HPX::hpx HPX::wrap_main Boost::boost fmt::fmt compile_features)
+target_link_libraries(HPXDemoDist HPX::hpx HPX::wrap_main Boost::boost fmt::fmt global_options)
 
 add_executable(HPXSerializationDistributed src/hpx_serialization/dataclass.cpp src/hpx_serialization/main.cpp)
 
@@ -30,4 +32,4 @@ if(DEFAULT_CONSTRUCTIBLE)
     target_compile_definitions(HPXSerializationDistributed PRIVATE "DEFAULT_CONSTRUCTIBLE")
 endif()
 
-target_link_libraries(HPXSerializationDistributed HPX::hpx HPX::wrap_main HPX::iostreams_component compile_features)
+target_link_libraries(HPXSerializationDistributed HPX::hpx HPX::wrap_main HPX::iostreams_component global_options)

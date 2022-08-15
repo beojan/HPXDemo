@@ -11,7 +11,7 @@
 
 #include <Eigen/Dense>
 using Mtrx = Eigen::Matrix<double, 10, 10>;
-constexpr int n_evts_per_block = 300000;
+constexpr int n_evts_per_block = 80000;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
@@ -80,6 +80,7 @@ int main(int argc, char* argv[]) {
     std::ifstream in{argv[1]};
     std::deque<EvtCtx> evts{};
     std::deque<hpx::shared_future<long long>> outputs{};
+    std::deque<hpx::shared_future<void>> cleanups{};
 
     long long n_evts = 0;
     std::chrono::duration<double, std::milli> total_time = 0ms;
@@ -96,7 +97,7 @@ int main(int argc, char* argv[]) {
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
             bool success = scheduler.schedule(ec);
             outputs.push_back(*final_ans);
-            final_ans->then(scheduler.cleanup(ec));
+            cleanups.emplace_back(final_ans->then(scheduler.cleanup(ec)));
             n_evts++;
         }
         auto this_time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
@@ -119,5 +120,7 @@ int main(int argc, char* argv[]) {
     fmt::print("Took {} reading out futures\n",
                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
                      std::chrono::steady_clock::now() - start_tm));
+    // wait for all cleanup to be done
+    hpx::wait_all(cleanups.begin(), cleanups.end());
     return 0;
 }
