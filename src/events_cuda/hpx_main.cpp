@@ -9,9 +9,15 @@
 #include <fmt/format.h>
 #include <hpx/wrap_main.hpp>
 
-#include <Eigen/Dense>
-using Mtrx = Eigen::Matrix<double, 10, 10>;
-constexpr int n_evts_per_block = 300000;
+// #include <Eigen/Dense>
+// using Mtrx = Eigen::Matrix<double, 10, 10>;
+
+#include <cuda.h>
+#include <cublas_v2.h>
+#include <curand_kernel.h>
+using MtrxCUDA = double*; // CUDA matrix is a device array managed with cudaMalloc and cudaFree
+constexpr int SZ = 10;
+constexpr int n_evts_per_block = 30000;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
@@ -21,39 +27,37 @@ template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
     }
 }
 
-Mtrx* make_mtrx(long long x) {
-    Mtrx* mtrx = new Mtrx();
-    mtrx->setRandom() *= x;
+// Mtrx* make_mtrx(long long x) {
+//     Mtrx* mtrx = new Mtrx();
+//     mtrx->setRandom() *= x;
+//     return mtrx;
+// }
+
+MtrxCUDA* make_mtrx_cuda(long long x) {
+    MtrxCUDA* mtrx = new MtrxCUDA();
+    cudaMalloc(mtrx, SZ * SZ);
+
     return mtrx;
 }
 
-long long plus(Mtrx* x, Mtrx* y) {
-    // fmt::print("Running plus({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
-    double ans = (*x + *y).norm();
-    return ans;
-}
+// long long plus(Mtrx* x, Mtrx* y) {
+//     double ans = (*x + *y).norm();
+//     return ans;
+// }
 
 long long scal_plus(long long x, long long y) {
-    // fmt::print("Running scal_plus({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
     return x + y;
 }
 
-long long times(Mtrx* x, Mtrx* y) {
-    // fmt::print("Running times({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
-    return (*x * *y).norm();
-}
+// long long times(Mtrx* x, Mtrx* y) {
+//     return (*x * *y).norm();
+// }
 
 long long square(long long x) {
-    // fmt::print("Running square({})\n", x);
     return x * x;
 }
 
 long long cube(long long x) {
-    // fmt::print("Running cube({})\n", x);
-    // std::this_thread::sleep_for(100s);
     return x * x * x;
 }
 
@@ -67,6 +71,7 @@ sch::Sched scheduler{
       sch::Define("Square Plus"_s, hana::make_tuple("Y plus X"_s), square),
       sch::Define("Square Times"_s, hana::make_tuple("Y times X"_s), square),
       sch::Define("Add Squares"_s, hana::make_tuple("Square Plus"_s, "Square Times"_s), scal_plus)};
+
 struct EvtCtx : public decltype(scheduler)::ECBase {
     long long X = 5;
     long long Y = 10;

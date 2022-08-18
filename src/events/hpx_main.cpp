@@ -11,7 +11,7 @@
 
 #include <Eigen/Dense>
 using Mtrx = Eigen::Matrix<double, 10, 10>;
-constexpr int n_evts_per_block = 80000;
+constexpr int n_evts_per_block = 300000;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {

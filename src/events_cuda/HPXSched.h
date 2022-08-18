@@ -30,6 +30,9 @@ template <class HS> struct Input {
 
     constexpr Input(HS name) : name(name) {}
 };
+
+template <class Key, class EC> auto& get_slot_fn(EC& ec) { return ec.slot[Key{}]; }
+template <class Key> BOOST_HOF_LIFT_CLASS(get_slot, get_slot_fn<Key>);
 template <class Key, class Inputs, class Func> auto Define(Key key, Inputs inputs, Func func) {
     static_assert(hana::is_a<hana::string_tag>(key), "Define's key must be a hana::string");
     static_assert(hana::Sequence<Inputs>::value, "Define's inputs must be a tuple");
@@ -37,9 +40,7 @@ template <class Key, class Inputs, class Func> auto Define(Key key, Inputs input
     using fut_p = hpx::shared_future<func_ret_t>*;
     // Tuple items are: key, inputs tuple, function to calculate, required, func returning
     // ref-to-ptr-to-future, prototype ptr-to-future
-    return hana::make_pair(key, hana::make_tuple(
-                                      key, inputs, std::function{func}, false,
-                                      [](auto& ec) -> fut_p& { return ec.slot[Key{}]; }, fut_p{}));
+    return hana::make_pair(key, hana::make_tuple(key, inputs, func, false, get_slot<Key>{}, fut_p{}));
 }
 
 template <class... Defs> class Sched {
@@ -56,7 +57,7 @@ template <class... Defs> class Sched {
     };
 
     Sched(Defs... defs) : definitions(hana::make_map(defs...)) {}
-    template <typename Key> auto& retrieve(ECBase& ec, Key key) {
+    template <typename Key, typename EC> auto& retrieve(EC& ec, Key key) {
         static_assert(!hana::is_a<sch::input_tag>(key), "Cannot 'retrieve' an input");
         hana::at_c<3>(definitions[key]) = true;     // Record that we need to calculate this value
         return hana::at_c<4>(definitions[key])(ec); // Return reference to pointer to future
@@ -118,7 +119,7 @@ template <class... Defs> class Sched {
             auto delete_intermediates = [&ec](auto&& item) {
                 constexpr auto is_required = hana::reverse_partial(hana::at, hana::size_c<3>);
                 if (!is_required(item)) {
-                    auto& fut = hana::at_c<4>(item)(ec);
+                    auto* fut = hana::at_c<4>(item)(ec);
                     if (!fut || !fut->valid()) {
                         return;
                     }
@@ -128,6 +129,7 @@ template <class... Defs> class Sched {
                             delete val;
                         }
                     }
+                    delete fut;
                 }
             };
             hana::for_each(hana::values(definitions), delete_intermediates);
