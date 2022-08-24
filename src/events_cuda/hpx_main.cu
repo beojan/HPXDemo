@@ -109,9 +109,9 @@ int main(int argc, char* argv[]) {
     fmt::print("Waiting for all events\n");
     auto start_tm = std::chrono::steady_clock::now();
     hpx::wait_all(outputs.begin(), outputs.end());
-    fmt::print("Took {} extra waiting for all events\n",
-               std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1, 1>>>(
-                     std::chrono::steady_clock::now() - start_tm));
+    auto extra_tm = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1, 1>>>(
+          std::chrono::steady_clock::now() - start_tm);
+    fmt::print("Took {} ({} average) extra waiting for all events\n", extra_tm, extra_tm / n_evts);
     fmt::print("Took {} total ({} average) scheduling events\n", total_time, total_time / n_evts);
     start_tm = std::chrono::steady_clock::now();
     volatile long long o = 0;

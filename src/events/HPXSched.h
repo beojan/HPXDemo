@@ -125,7 +125,6 @@ template <class... Defs> class Sched {
                     auto& val = fut->get();
                     if constexpr (std::is_pointer_v<std::remove_reference_t<decltype(val)>>) {
                         if (val) {
-			    fmt::print("Running cleanup!\n");
                             delete val;
                         }
                     }

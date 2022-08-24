@@ -9,8 +9,8 @@
 #include <fmt/format.h>
 #include <hpx/wrap_main.hpp>
 
-#include <Eigen/Dense>
-using Mtrx = Eigen::Matrix<double, 100, 100>;
+#include "CPUMtrx.h"
+using Mtrx = CPUMtrx<100>;
 constexpr int n_evts_per_block = 3000;
 using namespace std::chrono_literals;
 
@@ -22,28 +22,23 @@ template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
 }
 
 Mtrx* make_mtrx(long long x) {
-    Mtrx* mtrx = new Mtrx();
-    mtrx->setRandom() *= x;
+    Mtrx* mtrx = new Mtrx(x);
     return mtrx;
 }
 
 long long plus(Mtrx* x, Mtrx* y) {
-    // fmt::print("Running plus({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
     float ans = (*x + *y).norm();
     return ans;
 }
 
 long long scal_plus(long long x, long long y) {
-    // fmt::print("Running scal_plus({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
+    // fmt::print("Final ans: {}\n", x + y);
     return x + y;
 }
 
 long long times(Mtrx* x, Mtrx* y) {
-    // fmt::print("Running times({}, {})\n", x, y);
-    // std::this_thread::sleep_for(1s);
-    return (*x * *y).norm();
+    float ans = (*x * *y).norm();
+    return ans;
 }
 
 long long square(long long x) {
@@ -108,9 +103,9 @@ int main(int argc, char* argv[]) {
     fmt::print("Waiting for all events\n");
     auto start_tm = std::chrono::steady_clock::now();
     hpx::wait_all(outputs.begin(), outputs.end());
-    fmt::print("Took {} extra waiting for all events\n",
-               std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1, 1>>>(
-                     std::chrono::steady_clock::now() - start_tm));
+    auto extra_tm = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1, 1>>>(
+          std::chrono::steady_clock::now() - start_tm);
+    fmt::print("Took {} ({} average) extra waiting for all events\n", extra_tm, extra_tm / n_evts);
     fmt::print("Took {} total ({} average) scheduling events\n", total_time, total_time / n_evts);
     start_tm = std::chrono::steady_clock::now();
     volatile long long o = 0;
