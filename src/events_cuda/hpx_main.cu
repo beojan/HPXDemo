@@ -12,8 +12,8 @@
 // using Mtrx = Eigen::Matrix<double, 10, 10>;
 
 #include "CUDAMtrx.h"
-using Mtrx = CUDAMtrx<10>;
-constexpr int n_evts_per_block = 300000;
+using Mtrx = CUDAMtrx<100>;
+constexpr int n_evts_per_block = 3000;
 using namespace std::chrono_literals;
 
 // setup later

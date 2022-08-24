@@ -10,8 +10,8 @@
 #include <hpx/wrap_main.hpp>
 
 #include <Eigen/Dense>
-using Mtrx = Eigen::Matrix<double, 10, 10>;
-constexpr int n_evts_per_block = 300000;
+using Mtrx = Eigen::Matrix<double, 100, 100>;
+constexpr int n_evts_per_block = 3000;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
@@ -30,7 +30,7 @@ Mtrx* make_mtrx(long long x) {
 long long plus(Mtrx* x, Mtrx* y) {
     // fmt::print("Running plus({}, {})\n", x, y);
     // std::this_thread::sleep_for(1s);
-    double ans = (*x + *y).norm();
+    float ans = (*x + *y).norm();
     return ans;
 }
 
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
     std::deque<hpx::shared_future<void>> cleanups{};
 
     long long n_evts = 0;
-    std::chrono::duration<double, std::milli> total_time = 0ms;
+    std::chrono::duration<float, std::milli> total_time = 0ms;
     while (in.good()) {
         EvtCtx ec_template{};
         in >> ec_template.X >> ec_template.Y;
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
             cleanups.emplace_back(final_ans->then(scheduler.cleanup(ec)));
             n_evts++;
         }
-        auto this_time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
+        auto this_time = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
               std::chrono::steady_clock::now() - start_tm);
         total_time += this_time;
         fmt::print("Took {} to schedule {} events\n", this_time, n_evts_per_block);
