@@ -22,6 +22,8 @@ using namespace hana::literals;
 #include <hpx/local/future.hpp>
 #include <hpx/pack_traversal/unwrap.hpp>
 
+#include <cuda.h>
+
 namespace sch {
 class input_tag {};
 template <class HS> struct Input {
@@ -40,7 +42,8 @@ template <class Key, class Inputs, class Func> auto Define(Key key, Inputs input
     using fut_p = hpx::shared_future<func_ret_t>*;
     // Tuple items are: key, inputs tuple, function to calculate, required, func returning
     // ref-to-ptr-to-future, prototype ptr-to-future
-    return hana::make_pair(key, hana::make_tuple(key, inputs, func, false, get_slot<Key>{}, fut_p{}));
+    return hana::make_pair(key,
+                           hana::make_tuple(key, inputs, func, false, get_slot<Key>{}, fut_p{}));
 }
 
 template <class... Defs> class Sched {
@@ -115,6 +118,15 @@ template <class... Defs> class Sched {
     // Helper to schedule cleanup
     template <typename EC> auto cleanup(EC& ec) {
         return [this, &ec](auto&& /* future */) {
+            size_t free_byte;
+            size_t total_byte;
+            auto cuda_status = cudaMemGetInfo(&free_byte, &total_byte);
+            if (cuda_status == cudaSuccess) {
+                fmt::print("{} GB free of {} GB total\n", free_byte / 1e9, total_byte / 1e9);
+            }
+            else {
+                // fmt::print("CUDA Failure: {} -- {}\n", cudaGetErrorName(cuda_status), cudaGetErrorString(cuda_status));
+            }
             // Delete any intermediate values if they are pointers to free memory
             auto delete_intermediates = [&ec](auto&& item) {
                 constexpr auto is_required = hana::reverse_partial(hana::at, hana::size_c<3>);

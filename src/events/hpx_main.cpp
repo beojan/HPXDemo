@@ -10,7 +10,7 @@
 #include <hpx/wrap_main.hpp>
 
 #include "CPUMtrx.h"
-using Mtrx = CPUMtrx<100>;
+using Mtrx = CPUMtrx<1000>;
 constexpr int n_evts_per_block = 3000;
 using namespace std::chrono_literals;
 
