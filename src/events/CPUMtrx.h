@@ -2,7 +2,7 @@
 #define CPUMTRX_H_
 // This defines a CPUMtrx type
 
-#include <cblas.h>
+#include <mkl_cblas.h>
 #include <mkl_vsl.h>
 #include <cstdlib>
 #include <cstring>
