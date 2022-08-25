@@ -17,11 +17,8 @@ extern curandGenerator_t curand_gen;
         if (custatus != cudaSuccess) {                                                             \
             fmt::print("CUDA ERROR {} -- {} (in {})\n", cudaGetErrorName(custatus),                \
                        cudaGetErrorString(custatus), (#X));                                        \
+            std::terminate();                                                                      \
         }                                                                                          \
-        else {                                                                                     \
-            fmt::print("CUDA SUCCESS\n");                                                          \
-        }                                                                                          \
-        cudaGetLastError();                                                                        \
     } // comment to absorb ;
 
 #define CUB_CHECK(X)                                                                               \
@@ -30,6 +27,7 @@ extern curandGenerator_t curand_gen;
         if (custatus != CUBLAS_STATUS_SUCCESS) {                                                   \
             fmt::print("CUBLAS ERROR {} -- {} (in {})\n", cublasGetStatusName(custatus),           \
                        cublasGetStatusString(custatus), (#X));                                     \
+            std::terminate();                                                                      \
         }                                                                                          \
     } // comment to absorb ;
 const char* curandGetErrorString(curandStatus_t error) {
@@ -82,11 +80,12 @@ const char* curandGetErrorString(curandStatus_t error) {
         auto custatus = (X);                                                                       \
         if (custatus != CURAND_STATUS_SUCCESS) {                                                   \
             fmt::print("CURAND ERROR {} (in {})\n", curandGetErrorString(custatus), (#X));         \
+            std::terminate();                                                                      \
         }                                                                                          \
     } // comment to absorb ;
 
 void setup() {
-    cudaGetLastError();
+    CU_CHECK(cudaDeviceReset());
     CUB_CHECK(cublasCreate_v2(&cublas_hndl));
     CUR_CHECK(curandCreateGenerator(&curand_gen, CURAND_RNG_PSEUDO_DEFAULT));
     CU_CHECK(cudaDeviceSynchronize());

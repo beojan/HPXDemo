@@ -9,8 +9,8 @@ find_package(fmt)
 
 add_library(global_options INTERFACE)
 target_compile_features(global_options INTERFACE cxx_std_17 )
-target_compile_options(global_options INTERFACE -march=haswell -fsanitize=address -fsanitize=undefined -fsanitize=leak)
-target_link_options(global_options INTERFACE -fsanitize=address -fsanitize=undefined -fsanitize=leak)
+# target_compile_options(global_options INTERFACE -march=haswell -fsanitize=address -fsanitize=undefined -fsanitize=leak)
+# target_link_options(global_options INTERFACE -fsanitize=address -fsanitize=undefined -fsanitize=leak)
 
 add_executable(NoHPXDemo src/no_hpx/main.cpp)
 target_link_libraries(NoHPXDemo Boost::boost fmt::fmt global_options)
