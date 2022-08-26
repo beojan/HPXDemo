@@ -12,8 +12,9 @@
 // using Mtrx = Eigen::Matrix<double, 10, 10>;
 
 #include "CUDAMtrx.h"
-using Mtrx = CUDAMtrx<100>;
+using Mtrx = CUDAMtrx<1000>;
 constexpr int n_evts_per_block = 3000;
+constexpr int n_evts_in_flight = 30;
 using namespace std::chrono_literals;
 
 // setup later
@@ -100,6 +101,10 @@ int main(int argc, char* argv[]) {
             outputs.push_back(*final_ans);
             cleanups.emplace_back(final_ans->then(scheduler.cleanup(ec)));
             n_evts++;
+            if (n_evts % n_evts_in_flight == n_evts_in_flight - 1) {
+                hpx::wait_all(cleanups.begin(), cleanups.end());
+                cleanups.clear();
+            }
         }
         auto this_time = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
               std::chrono::steady_clock::now() - start_tm);

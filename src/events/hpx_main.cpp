@@ -12,6 +12,7 @@
 #include "CPUMtrx.h"
 using Mtrx = CPUMtrx<1000>;
 constexpr int n_evts_per_block = 3000;
+constexpr int n_evts_in_flight = 30;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
@@ -94,6 +95,10 @@ int main(int argc, char* argv[]) {
             outputs.push_back(*final_ans);
             cleanups.emplace_back(final_ans->then(scheduler.cleanup(ec)));
             n_evts++;
+            if (n_evts % n_evts_in_flight == n_evts_in_flight - 1) {
+                hpx::wait_all(cleanups.begin(), cleanups.end());
+                cleanups.clear();
+            }
         }
         auto this_time = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
               std::chrono::steady_clock::now() - start_tm);

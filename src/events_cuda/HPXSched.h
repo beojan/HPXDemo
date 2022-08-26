@@ -22,8 +22,6 @@ using namespace hana::literals;
 #include <hpx/local/future.hpp>
 #include <hpx/pack_traversal/unwrap.hpp>
 
-#include <cuda.h>
-
 namespace sch {
 class input_tag {};
 template <class HS> struct Input {
@@ -120,13 +118,6 @@ template <class... Defs> class Sched {
         return [this, &ec](auto&& /* future */) {
             size_t free_byte;
             size_t total_byte;
-            auto cuda_status = cudaMemGetInfo(&free_byte, &total_byte);
-            if (cuda_status == cudaSuccess) {
-                fmt::print("{} GB free of {} GB total\n", free_byte / 1e9, total_byte / 1e9);
-            }
-            else {
-                // fmt::print("CUDA Failure: {} -- {}\n", cudaGetErrorName(cuda_status), cudaGetErrorString(cuda_status));
-            }
             // Delete any intermediate values if they are pointers to free memory
             auto delete_intermediates = [&ec](auto&& item) {
                 constexpr auto is_required = hana::reverse_partial(hana::at, hana::size_c<3>);
