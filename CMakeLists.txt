@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.17)
 project(HPXDemo CXX)
 find_package(MKL CONFIG REQUIRED)
 find_package(HPX REQUIRED)
+find_package(TBB REQUIRED)
 find_package(Boost REQUIRED)
 # find_package(Eigen3 3.3 REQUIRED)
 find_package(CUDAToolkit 10 REQUIRED)
@@ -26,6 +27,12 @@ target_link_libraries(HPXDemoCUDA HPX::hpx HPX::wrap_main Boost::boost CUDA::cud
 
 add_executable(HPXDemoDist src/events_distributed/hpx_main.cpp)
 target_link_libraries(HPXDemoDist HPX::hpx HPX::wrap_main Boost::boost fmt::fmt global_options)
+
+add_executable(TBBDemo src/events/tbb_main.cpp)
+target_link_libraries(TBBDemo TBB::tbb TBB::wrap_main Boost::boost MKL::MKL fmt::fmt global_options)
+
+# add_executable(HPXDemo src/events/hpx_main.cpp)
+# target_link_libraries(HPXDemo HPX::hpx HPX::wrap_main Boost::boost MKL::MKL fmt::fmt global_options)
 
 add_executable(HPXSerializationDistributed src/hpx_serialization/dataclass.cpp src/hpx_serialization/main.cpp)
 
