@@ -4,7 +4,7 @@
 #include <iostream>
 #include <thread>
 
-#include "HPXSched.h"
+#include "TBBSched.h"
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 

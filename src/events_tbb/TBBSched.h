@@ -14,13 +14,12 @@ namespace ct = boost::callable_traits;
 // For compile-time string literals
 #define BOOST_HANA_CONFIG_ENABLE_STRING_UDL
 #include <boost/hana.hpp>
+#include <boost/hana/ext/std/tuple.hpp>
 namespace hana = boost::hana;
 using namespace hana::literals;
 
-#include <hpx/async_base/async.hpp>
-#include <hpx/async_base/dataflow.hpp>
-#include <hpx/local/future.hpp>
-#include <hpx/pack_traversal/unwrap.hpp>
+#include <tbb/tbb.h>
+namespace flow = oneapi::tbb::flow;
 
 namespace sch {
 class input_tag {};
@@ -33,37 +32,100 @@ template <class HS> struct Input {
 template <class Key, class Inputs, class Func> auto Define(Key key, Inputs inputs, Func func) {
     static_assert(hana::is_a<hana::string_tag>(key), "Define's key must be a hana::string");
     static_assert(hana::Sequence<Inputs>::value, "Define's inputs must be a tuple");
-    using func_ret_t = ct::return_type_t<Func>;
-    using fut_p = hpx::shared_future<func_ret_t>*;
-    // Tuple items are: key, inputs tuple, function to calculate, required, func returning
-    // ref-to-ptr-to-future, prototype ptr-to-future
-    return hana::make_pair(key, hana::make_tuple(
-                                      key, inputs, std::function{func}, false,
-                                      [](auto& ec) -> fut_p& { return ec.slot[Key{}]; }, fut_p{}));
+    // Tuple items are: key, inputs tuple, function to calculate, bool (is final)
+    return hana::make_pair(key, hana::make_tuple(key, inputs, std::function{func}, false));
 }
 
 template <class... Defs> class Sched {
   private:
     hana::map<Defs...> definitions;
+    // Given a definition, get a default-constructed prototype of the function return type
+    static constexpr auto get_ret_t = [](auto&& F) {
+        return ct::return_type_t<decltype(hana::at_c<2>(F))>{};
+    };
+    // Given a definition, find out if this key has been retrieved
+    static constexpr auto get_key = hana::reverse_partial(hana::at, hana::size_c<0>);
+    static constexpr auto get_inputs = hana::reverse_partial(hana::at, hana::size_c<1>);
+    static constexpr auto get_fn = hana::reverse_partial(hana::at, hana::size_c<2>);
+    static constexpr auto is_final = hana::reverse_partial(hana::at, hana::size_c<3>);
+
     using Keys = decltype(hana::keys(definitions));
-    using FutTypes = decltype(hana::transform(hana::values(definitions),
-                                              hana::reverse_partial(hana::at, hana::size_c<5>)));
+    using ResultTypes = decltype(hana::transform(hana::values(definitions), get_ret_t));
+
+    // Given a key and an event context, get the node
+    template <class EC, class Key> static flow::graph_node*& get_node(EC& ec, const Key& k) {
+        return ec.node_slot[k];
+    }
+
+    // Make input nodes
+    template <class EC> void make_input_nodes(EC& ec) {
+        auto input_keys = hana::transform(hana::keys(ec), [](auto&& k) { return sch::Input(k); });
+        auto input_vals = hana::members(ec);
+        auto make_input_node = [&ec](auto&& k, auto&& v) {
+            auto& node = *ec.nodes.emplace_back(
+                  new flow::continue_node(ec.graph, [&v] { return v; }));
+            get_node(ec, k) = &node;
+        };
+        hana::zip_with(make_input_node, input_keys, input_vals);
+    }
+    // Makes internal nodes
+    template <class EC, class Val> void make_node(EC& ec, const Val& v) {
+        using func_t = decltype(get_fn(v));
+        using args_t = ct::args_t<func_t>;
+        using ret_t = ct::return_type_t<func_t>;
+
+        auto& input = *ec.nodes.emplace_back(new flow::join_node<args_t, flow::queuing>(ec.graph));
+        auto& fn = *ec.nodes.emplace_back(
+              new flow::function_node(ec.graph, 1, hana::fuse(get_fn(v))));
+        flow::make_edge(input, fn);
+
+        if (is_final(v)) {
+            auto& write_fn = *ec.nodes.emplace_back(new flow::function_node(
+                  ec.graph, 1, [&v, &ec](const ret_t& value) { ec.slot[get_key(v)] = value; }));
+            flow::make_edge(fn, write_fn);
+        }
+
+        auto& composite = *ec.nodes.emplace_back(
+              new flow::composite_node<args_t, std::tuple<ret_t>>(ec.graph));
+        composite.set_external_ports(input.input_ports(), fn.output_ports());
+
+        // add to definition
+        get_node(ec, get_key(v)) = &composite;
+    }
+
+    // Makes connections between nodes
+    template <class EC, class Val> void make_connections(EC& ec, const Val& v) {
+        auto input_nodes = hana::transform(
+              get_inputs(v),
+              [&ec](auto&& in_key) -> flow::graph_node& { return *get_node(ec, in_key); });
+        hana::zip_with(flow::make_edge, input_nodes, get_node(ec, get_key(v))->input_ports());
+    }
+
+    // static auto make_nodes() { return hana::to_map(hana::zip_with(hana::make_pair, Keys{}, )); }
 
   public:
     struct ECBase {
-        decltype(hana::to_map(hana::zip_with(hana::make_pair, Keys{}, FutTypes{})))
-              slot = hana::to_map(hana::zip_with(hana::make_pair, Keys{}, FutTypes{}));
+        decltype(hana::to_map(hana::zip_with(hana::make_pair, Keys{}, ResultTypes{}))) slot{};
+
+        decltype(hana::to_map(hana::transform(
+              [](auto&& key) {
+                  return hana::make_pair(key, static_cast<flow::graph_node*>(nullptr));
+              },
+              Keys{}))) node_slot{};
+        flow::graph graph{};
+        std::vector<std::unique_ptr<flow::graph_node>> nodes{}; // Need to keep this list to destroy
+                                                                // them at end
     };
 
     Sched(Defs... defs) : definitions(hana::make_map(defs...)) {}
     template <typename Key> auto& retrieve(ECBase& ec, Key key) {
         static_assert(!hana::is_a<sch::input_tag>(key), "Cannot 'retrieve' an input");
-        hana::at_c<3>(definitions[key]) = true;     // Record that we need to calculate this value
-        return hana::at_c<4>(definitions[key])(ec); // Return reference to pointer to future
+        is_final(definitions[key]) = true;
+        return ec.slot[key]; // Return reference to pointer to future
     }
 
     // This function does the scheduling (and running)
-    // For now, lets use HPX
+    // This time, use TBB flow graphs
     template <typename EC> bool schedule(EC& ec) {
         constexpr auto dataflow = BOOST_HOF_LIFT(hpx::dataflow);
         constexpr auto is_required = hana::reverse_partial(hana::at, hana::size_c<3>);
