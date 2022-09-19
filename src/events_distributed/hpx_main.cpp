@@ -15,6 +15,8 @@
 constexpr int n_evts_per_block = 30000;
 using namespace std::chrono_literals;
 
+template <> struct fmt::formatter<hpx::id_type> : ostream_formatter {};
+
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
     // Busy waits for a given length of time.
     auto start = std::chrono::steady_clock::now();

@@ -4,13 +4,13 @@ find_package(MKL CONFIG REQUIRED)
 find_package(HPX REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Boost REQUIRED)
-# find_package(Eigen3 3.3 REQUIRED)
+find_package(Eigen3 3.3 REQUIRED)
 find_package(CUDAToolkit 10 REQUIRED)
 find_package(fmt)
 
 add_library(global_options INTERFACE)
 target_compile_features(global_options INTERFACE cxx_std_17 )
-# target_compile_options(global_options INTERFACE -march=haswell -fsanitize=address -fsanitize=undefined -fsanitize=leak)
+target_compile_options(global_options INTERFACE -march=native -O3)
 # target_link_options(global_options INTERFACE -fsanitize=address -fsanitize=undefined -fsanitize=leak)
 
 add_executable(NoHPXDemo src/no_hpx/main.cpp)
@@ -28,17 +28,17 @@ target_link_libraries(HPXDemoCUDA HPX::hpx HPX::wrap_main Boost::boost CUDA::cud
 add_executable(HPXDemoDist src/events_distributed/hpx_main.cpp)
 target_link_libraries(HPXDemoDist HPX::hpx HPX::wrap_main Boost::boost fmt::fmt global_options)
 
-add_executable(TBBDemo src/events/tbb_main.cpp)
-target_link_libraries(TBBDemo TBB::tbb TBB::wrap_main Boost::boost MKL::MKL fmt::fmt global_options)
+add_executable(TBBDemo src/events_tbb/tbb_main.cpp)
+target_link_libraries(TBBDemo TBB::tbb Boost::boost MKL::MKL fmt::fmt global_options)
 
 # add_executable(HPXDemo src/events/hpx_main.cpp)
 # target_link_libraries(HPXDemo HPX::hpx HPX::wrap_main Boost::boost MKL::MKL fmt::fmt global_options)
 
-add_executable(HPXSerializationDistributed src/hpx_serialization/dataclass.cpp src/hpx_serialization/main.cpp)
+# add_executable(HPXSerializationDistributed src/hpx_serialization/dataclass.cpp src/hpx_serialization/main.cpp)
 
-option(DEFAULT_CONSTRUCTIBLE "Use default constructor for serialization" ON)
-if(DEFAULT_CONSTRUCTIBLE)
-    target_compile_definitions(HPXSerializationDistributed PRIVATE "DEFAULT_CONSTRUCTIBLE")
-endif()
+# option(DEFAULT_CONSTRUCTIBLE "Use default constructor for serialization" ON)
+# if(DEFAULT_CONSTRUCTIBLE)
+#     target_compile_definitions(HPXSerializationDistributed PRIVATE "DEFAULT_CONSTRUCTIBLE")
+# endif()
 
-target_link_libraries(HPXSerializationDistributed HPX::hpx HPX::wrap_main HPX::iostreams_component global_options)
+# target_link_libraries(HPXSerializationDistributed HPX::hpx HPX::wrap_main HPX::iostreams_component global_options)

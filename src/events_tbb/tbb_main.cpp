@@ -11,7 +11,7 @@
 #include "CPUMtrx.h"
 using Mtrx = CPUMtrx<1000>;
 constexpr int n_evts_per_block = 3000;
-constexpr int n_evts_in_flight = 30;
+constexpr int n_evts_in_flight = 32;
 using namespace std::chrono_literals;
 
 template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
@@ -21,12 +21,12 @@ template <class R, class P> void busy_wait(std::chrono::duration<R, P> time) {
     }
 }
 
-Mtrx* make_mtrx(long long x) {
-    Mtrx* mtrx = new Mtrx(x);
+std::shared_ptr<Mtrx> make_mtrx(long long x) {
+    auto mtrx = std::make_shared<Mtrx>(x);
     return mtrx;
 }
 
-long long plus(Mtrx* x, Mtrx* y) {
+long long plus(std::shared_ptr<Mtrx> x, std::shared_ptr<Mtrx> y) {
     float ans = (*x + *y).norm();
     return ans;
 }
@@ -36,7 +36,7 @@ long long scal_plus(long long x, long long y) {
     return x + y;
 }
 
-long long times(Mtrx* x, Mtrx* y) {
+long long times(std::shared_ptr<Mtrx> x, std::shared_ptr<Mtrx> y) {
     float ans = (*x * *y).norm();
     return ans;
 }
@@ -63,19 +63,24 @@ sch::Sched scheduler{
       sch::Define("Square Times"_s, hana::make_tuple("Y times X"_s), square),
       sch::Define("Add Squares"_s, hana::make_tuple("Square Plus"_s, "Square Times"_s), scal_plus)};
 struct EvtCtx : public decltype(scheduler)::ECBase {
-    long long X = 5;
-    long long Y = 10;
+    BOOST_HANA_DEFINE_STRUCT(EvtCtx, (long long, X), (long long, Y));
+    decltype(hana::to_map(
+          hana::transform(hana::insert_range(decltype(scheduler)::Keys{}, hana::size_c<0>,
+                                             hana::make_tuple("X"_s, "Y"_s)),
+                          make_key_ptr_pair))) node_slot{};
 };
-BOOST_HANA_ADAPT_STRUCT(EvtCtx, X, Y);
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        fmt::print("Usage: {} input_file\n", argv[0]);
+    auto limit_n_threads = tbb::global_control(tbb::global_control::max_allowed_parallelism,
+                                               std::atoi(argv[2]));
+    if (argc != 3) {
+        fmt::print("Usage: {} input_file num_threads\n", argv[0]);
+        return 1;
     }
     std::ifstream in{argv[1]};
     std::deque<EvtCtx> evts{};
-    std::deque<hpx::shared_future<long long>> outputs{};
-    std::deque<hpx::shared_future<void>> cleanups{};
+    std::deque<EvtCtx*> cleanup_temp{};
+    std::deque<std::reference_wrapper<long long>> outputs{};
 
     long long n_evts = 0;
     std::chrono::duration<float, std::milli> total_time = 0ms;
@@ -91,12 +96,17 @@ int main(int argc, char* argv[]) {
             ec = ec_template;
             auto& final_ans = scheduler.retrieve(ec, "Add Squares"_s);
             bool success = scheduler.schedule(ec);
-            outputs.push_back(*final_ans);
-            cleanups.emplace_back(final_ans->then(scheduler.cleanup(ec)));
+            outputs.emplace_back(final_ans);
+            cleanup_temp.push_back(&ec);
             n_evts++;
             if (n_evts % n_evts_in_flight == n_evts_in_flight - 1) {
-                hpx::wait_all(cleanups.begin(), cleanups.end());
-                cleanups.clear();
+                // auto start_wait = std::chrono::steady_clock::now();
+                tbb::parallel_for_each(cleanup_temp, [](EvtCtx* const& ec) { ec->wait(); });
+                // auto end_wait = std::chrono::steady_clock::now() - start_wait;
+                // fmt::print("This wait took {}\n",
+                //            std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                //                  end_wait));
+                cleanup_temp.clear();
             }
         }
         auto this_time = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
@@ -106,7 +116,8 @@ int main(int argc, char* argv[]) {
     }
     fmt::print("Waiting for all events\n");
     auto start_tm = std::chrono::steady_clock::now();
-    hpx::wait_all(outputs.begin(), outputs.end());
+    // hpx::wait_all(outputs.begin(), outputs.end());
+    tbb::parallel_for_each(evts, [](const EvtCtx& ec) { const_cast<EvtCtx&>(ec).wait(); });
     auto extra_tm = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
           std::chrono::steady_clock::now() - start_tm);
     fmt::print("Took {} ({} average) extra waiting for all events\n", extra_tm, extra_tm / n_evts);
@@ -114,12 +125,12 @@ int main(int argc, char* argv[]) {
     start_tm = std::chrono::steady_clock::now();
     volatile long long o = 0;
     for (auto&& out : outputs) {
-        o = out.get();
+        o = out;
     }
-    fmt::print("Took {} reading out futures\n",
+    fmt::print("Took {} reading out data\n",
                std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
                      std::chrono::steady_clock::now() - start_tm));
     // wait for all cleanup to be done
-    hpx::wait_all(cleanups.begin(), cleanups.end());
+    // hpx::wait_all(cleanups.begin(), cleanups.end());
     return 0;
 }
