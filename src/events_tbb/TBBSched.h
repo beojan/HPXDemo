@@ -95,7 +95,7 @@ template <class... Defs> class Sched {
         auto make_input_node = [&ec](auto&& k) {
             auto& v = hana::at_key(ec, k.name);
             auto& node = ec.add_node(new flow::continue_node<std::remove_reference_t<decltype(v)>>(
-                  ec.graph, [&v](const flow::continue_msg&) { return v; }));
+                  *ec.graph, [&v](const flow::continue_msg&) { return v; }));
             make_edge(*ec.start_node, node);
             get_node<true>(ec, k) = &node;
         };
@@ -107,14 +107,14 @@ template <class... Defs> class Sched {
         using args_t = ct::args_t<func_t>;
         using ret_t = ct::return_type_t<func_t>;
 
-        auto& input = ec.add_node(new flow::join_node<args_t, flow::queueing>(ec.graph));
+        auto& input = ec.add_node(new flow::join_node<args_t, flow::queueing>(*ec.graph));
         auto& fn = ec.add_node(
-              new flow::function_node<args_t, ret_t>(ec.graph, 1, hana::fuse(get_fn(v))));
+              new flow::function_node<args_t, ret_t>(*ec.graph, 1, hana::fuse(get_fn(v))));
         flow::make_edge(input, fn);
 
         if (is_final(v)) {
             auto& write_fn = ec.add_node(
-                  new flow::function_node<ret_t, bool>(ec.graph, 1, [&v, &ec](const ret_t& value) {
+                  new flow::function_node<ret_t, bool>(*ec.graph, 1, [&v, &ec](const ret_t& value) {
                       ec.slot[get_key(v)] = value;
                       return true;
                   }));
@@ -122,8 +122,9 @@ template <class... Defs> class Sched {
         }
 
         auto& composite = ec.add_node(
-              new flow::composite_node<args_t, std::tuple<ret_t>>(ec.graph));
-        composite.set_external_ports(std::apply(BOOST_HOF_LIFT(std::tie), input.input_ports()), std::tie(fn));
+              new flow::composite_node<args_t, std::tuple<ret_t>>(*ec.graph));
+        composite.set_external_ports(std::apply(BOOST_HOF_LIFT(std::tie), input.input_ports()),
+                                     std::tie(fn));
 
         // add to definition
         get_node<true>(ec, get_key(v)) = &composite;
@@ -135,8 +136,8 @@ template <class... Defs> class Sched {
     }
     // Makes connections between nodes
     template <class EC, class Val> static void make_connections(EC& ec, const Val& v) {
-        auto input_nodes = hana::transform(
-              get_inputs(v), [&ec](auto&& in_key) { return get_node(ec, in_key); });
+        auto input_nodes = hana::transform(get_inputs(v),
+                                           [&ec](auto&& in_key) { return get_node(ec, in_key); });
         make_edges_impl(input_nodes, *get_node(ec, get_key(v)),
                         std::make_index_sequence<hana::size(input_nodes)>());
     }
@@ -147,7 +148,7 @@ template <class... Defs> class Sched {
         static constexpr auto make_key_ptr_pair = [](auto&& key) {
             return hana::make_pair(key, static_cast<flow::graph_node*>(nullptr));
         };
-        flow::graph graph{};
+        std::unique_ptr<flow::graph> graph = std::make_unique<flow::graph>();
         bool done{false};
         std::unique_ptr<flow::continue_node<flow::continue_msg>> start_node{nullptr};
         std::vector<std::unique_ptr<flow::graph_node>> nodes{}; // Need to keep this list to destroy
@@ -155,7 +156,7 @@ template <class... Defs> class Sched {
                                                                 //
         ECBase& operator=(const ECBase&) {
             start_node.reset(new flow::continue_node<flow::continue_msg>(
-                  graph, 1, [](const flow::continue_msg&) { return flow::continue_msg(); }));
+                  *graph, 1, [](const flow::continue_msg&) { return flow::continue_msg(); }));
             return *this;
         }
 
@@ -168,8 +169,9 @@ template <class... Defs> class Sched {
         void wait() {
             // simple helper so we can wait for all events to complete
             if (done) return;
-            graph.wait_for_all();
+            graph->wait_for_all();
             done = true;
+            delete graph.release();
             nodes.clear();
             delete start_node.release();
         }
